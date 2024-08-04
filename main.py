@@ -1,7 +1,15 @@
+import asyncio
+import itertools
 import json
+import subprocess
+import time
 from typing import List
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+
+import cpu_stressors
+
+#from decorators import timeout
 
 app = FastAPI()
 
@@ -49,11 +57,51 @@ async def root():
     return {"message": "OK", "status": 200,  "error-message": None }
 
 
-@app.post("/run")
+@app.post("/runng")
 async def run(commands: Commands):
+    retvals = []
+    for command in commands.commands:
+        for _ in range(command.repetitions):
+            print('COMMAND: ', command.command)
+            print('RUNNING: ', ["stress-ng"] + command.command.split())
+            retvals.append(subprocess.run(["stress-ng"] + command.command.split(), stdout=subprocess.PIPE))
     
-    return commands
+    return retvals
 
+
+
+@app.get("/test")
+async def test():
+
+    async def loop():
+        await asyncio.sleep(1)
+
+    async def loop2():
+        try:
+            x = 0
+            for _ in itertools.count():
+                x += 1
+                await asyncio.sleep(0)
+        except asyncio.CancelledError as ex:
+            print (f"{x} iterations")
+            raise ex
+
+    task = asyncio.create_task(cpu_stressors.euler2())        
+
+    start = time.time()
+    try:
+        await asyncio.wait_for(task, timeout=0.5)
+        raise HTTPException(400, "No timeout")
+    except TimeoutError:
+        return {"status": 200, "message": "Timeout at {:.3f}".format(time.time() - start)}
+   
+
+
+    
+
+
+        
+    
 
 
     
